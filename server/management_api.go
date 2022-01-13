@@ -160,11 +160,17 @@ func (s *Server) GetFilteredNamedGroupingPolicy(ctx context.Context, in *pb.Filt
 
 // HasPolicy determines whether an authorization rule exists.
 func (s *Server) HasPolicy(ctx context.Context, in *pb.PolicyRequest) (*pb.BoolReply, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	return s.HasNamedPolicy(ctx, in)
 }
 
 // HasNamedPolicy determines whether a named authorization rule exists.
 func (s *Server) HasNamedPolicy(ctx context.Context, in *pb.PolicyRequest) (*pb.BoolReply, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	e, err := s.getEnforcer(int(in.EnforcerHandler))
 	if err != nil {
 		return &pb.BoolReply{}, err
@@ -175,12 +181,18 @@ func (s *Server) HasNamedPolicy(ctx context.Context, in *pb.PolicyRequest) (*pb.
 
 // HasGroupingPolicy determines whether a role inheritance rule exists.
 func (s *Server) HasGroupingPolicy(ctx context.Context, in *pb.PolicyRequest) (*pb.BoolReply, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	in.PType = "g"
 	return s.HasNamedGroupingPolicy(ctx, in)
 }
 
 // HasNamedGroupingPolicy determines whether a named role inheritance rule exists.
 func (s *Server) HasNamedGroupingPolicy(ctx context.Context, in *pb.PolicyRequest) (*pb.BoolReply, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	e, err := s.getEnforcer(int(in.EnforcerHandler))
 	if err != nil {
 		return &pb.BoolReply{}, err

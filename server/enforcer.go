@@ -19,6 +19,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"strings"
+	"sync"
 
 	pb "github.com/casbin/casbin-server/proto"
 	"github.com/casbin/casbin/v2"
@@ -28,20 +29,27 @@ import (
 
 // Server is used to implement proto.CasbinServer.
 type Server struct {
-	enforcerMap map[int]*casbin.Enforcer
+	m           sync.RWMutex
+	enforcerMap map[int]*casbin.SyncedEnforcer
 	adapterMap  map[int]persist.Adapter
 }
 
 func NewServer() *Server {
 	s := Server{}
 
-	s.enforcerMap = map[int]*casbin.Enforcer{}
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	s.enforcerMap = map[int]*casbin.SyncedEnforcer{}
 	s.adapterMap = map[int]persist.Adapter{}
 
 	return &s
 }
 
-func (s *Server) getEnforcer(handle int) (*casbin.Enforcer, error) {
+func (s *Server) getEnforcer(handle int) (*casbin.SyncedEnforcer, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	if _, ok := s.enforcerMap[handle]; ok {
 		return s.enforcerMap[handle], nil
 	} else {
@@ -50,6 +58,9 @@ func (s *Server) getEnforcer(handle int) (*casbin.Enforcer, error) {
 }
 
 func (s *Server) getAdapter(handle int) (persist.Adapter, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	if _, ok := s.adapterMap[handle]; ok {
 		return s.adapterMap[handle], nil
 	} else {
@@ -57,13 +68,19 @@ func (s *Server) getAdapter(handle int) (persist.Adapter, error) {
 	}
 }
 
-func (s *Server) addEnforcer(e *casbin.Enforcer) int {
+func (s *Server) addEnforcer(e *casbin.SyncedEnforcer) int {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	cnt := len(s.enforcerMap)
 	s.enforcerMap[cnt] = e
 	return cnt
 }
 
 func (s *Server) addAdapter(a persist.Adapter) int {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	cnt := len(s.adapterMap)
 	s.adapterMap[cnt] = a
 	return cnt
@@ -71,7 +88,7 @@ func (s *Server) addAdapter(a persist.Adapter) int {
 
 func (s *Server) NewEnforcer(ctx context.Context, in *pb.NewEnforcerRequest) (*pb.NewEnforcerReply, error) {
 	var a persist.Adapter
-	var e *casbin.Enforcer
+	var e *casbin.SyncedEnforcer
 
 	if in.AdapterHandle != -1 {
 		var err error
@@ -101,7 +118,8 @@ func (s *Server) NewEnforcer(ctx context.Context, in *pb.NewEnforcerRequest) (*p
 			return &pb.NewEnforcerReply{Handler: 0}, err
 		}
 
-		e, err = casbin.NewEnforcer(m, a)
+		// e, err = casbin.NewEnforcer(m, a)
+		e, err = casbin.NewSyncedEnforcer(m, a)
 		if err != nil {
 			return &pb.NewEnforcerReply{Handler: 0}, err
 		}
@@ -111,7 +129,8 @@ func (s *Server) NewEnforcer(ctx context.Context, in *pb.NewEnforcerRequest) (*p
 			return &pb.NewEnforcerReply{Handler: 0}, err
 		}
 
-		e, err = casbin.NewEnforcer(m, a)
+		// e, err = casbin.NewEnforcer(m, a)
+		e, err = casbin.NewSyncedEnforcer(m, a)
 		if err != nil {
 			return &pb.NewEnforcerReply{Handler: 0}, err
 		}
